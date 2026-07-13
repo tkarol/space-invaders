@@ -1,11 +1,13 @@
 /**
  * ===========================================
- * SPACE INVADERS - AI COMMANDER EDITION
+ * VELLOX - CYBER DEFENSE SIMULATOR
+ * Booz Allen Hamilton | Fight AI With AI
  * Main Game Module
  * ===========================================
- * 
- * A complete Space Invaders game with Microsoft Foundry Local
- * LLM integration for dynamic gameplay enhancement.
+ *
+ * A Space-Invaders-style cyber-defense game themed around Booz Allen's
+ * Vellox AI-native product suite (Reverser, Ranger, Navigator), with
+ * Microsoft Foundry Local LLM integration for a dynamic AI Commander.
  */
 
 import { llmManager } from './llm.js';
@@ -24,7 +26,7 @@ const CONFIG = {
         width: 50,
         height: 30,
         speed: 7,           // Slightly faster player
-        color: '#00ff41',
+        color: '#22d3ee',   // Vellox defender cyan
         lives: 5            // More lives to start
     },
     enemy: {
@@ -43,16 +45,18 @@ const CONFIG = {
         height: 15,
         playerSpeed: 10,    // Faster player shots (was 8)
         enemySpeed: 2.5,    // Slower enemy shots (was 4)
-        playerColor: '#00ff41',
-        enemyColor: '#ff0040'
+        playerColor: '#22d3ee',  // Vellox cyan
+        enemyColor: '#ff2b4e'    // Adversary red
     },
     powerUp: {
         width: 25,
         height: 25,
         speed: 2,
         spawnChance: 0.008,  // Frequent power-ups
-        types: ['spread', 'laser', 'rapid', 'missile', 'shield', 'extraLife', 'bomb', 'bonus'],
-        duration: 8000       // Weapon power-ups last 8 seconds
+        // Weapons map to the three Vellox products (laser=Reverser,
+        // missile=Ranger, spread=Navigator); the rest are support capabilities.
+        types: ['spread', 'laser', 'missile', 'shield', 'extraLife', 'bomb', 'bonus'],
+        duration: 8000       // Product deployments last 8 seconds
     },
     scoring: {
         enemyKill: 10,
@@ -69,6 +73,35 @@ const CONFIG = {
         commentInterval: 15000     // Time between performance comments
     }
 };
+
+// ============================================
+// Vellox Branding / Narrative
+// ============================================
+
+// The cyber adversary — enemy rows read top-to-bottom as escalating threats
+const ADVERSARY_TYPES = ['MALWARE', 'RANSOMWARE', 'APT'];
+
+// Each level foregrounds one Vellox product phase (cycles as levels climb),
+// so the campaign walks the operator through the portfolio: analyze, hunt, monitor.
+const VELLOX_PHASES = [
+    {
+        product: 'VELLOX REVERSER',
+        desc: 'Vellox Reverser is dissecting the adversary payload — reverse-engineering the threat in minutes.'
+    },
+    {
+        product: 'VELLOX RANGER',
+        desc: 'Vellox Ranger is autonomously mapping the environment and hunting the intrusion to ground.'
+    },
+    {
+        product: 'VELLOX NAVIGATOR',
+        desc: 'Vellox Navigator is holding continuous watch across every vector, enforcing compliance in real time.'
+    }
+];
+
+/** The Vellox product phase that themes a given level. */
+function getPhase(level) {
+    return VELLOX_PHASES[(level - 1) % VELLOX_PHASES.length];
+}
 
 // ============================================
 // Game State
@@ -99,7 +132,12 @@ const gameState = {
     // Timing
     lastTauntTime: 0,
     lastCommentTime: 0,
-    
+
+    // Game feel / juice
+    shake: 0,              // Current screen-shake magnitude (decays each step)
+    hitFlash: 0,           // Red flash intensity when player is hit (0-1)
+    invincibleUntil: 0,    // Timestamp until which the player ignores damage
+
     // Input state
     keys: {
         left: false,
@@ -137,6 +175,7 @@ const weaponDisplay = document.getElementById('currentWeapon');
 const aiStatusDisplay = document.getElementById('aiStatus');
 const aiConsole = document.getElementById('aiConsole');
 const aiThinking = document.getElementById('aiThinking');
+const commandBanner = document.getElementById('commandBanner');
 
 // Screens
 const startScreen = document.getElementById('startScreen');
@@ -182,7 +221,7 @@ function saveLeaderboard(leaderboard) {
 function addScore(name, score, level) {
     const leaderboard = getLeaderboard();
     const entry = {
-        name: name.toUpperCase().substring(0, 10) || 'PILOT',
+        name: name.toUpperCase().substring(0, 10) || 'OPERATOR',
         score: score,
         level: level,
         date: new Date().toISOString()
@@ -243,14 +282,28 @@ class Player {
         this.y = CONFIG.canvas.height - this.height - 20;
         this.speed = CONFIG.player.speed;
         this.color = CONFIG.player.color;
+        this.vx = 0;        // Horizontal velocity for smooth, momentum-based movement
     }
-    
+
     update() {
-        if (gameState.keys.left && this.x > 0) {
-            this.x -= this.speed;
-        }
-        if (gameState.keys.right && this.x < CONFIG.canvas.width - this.width) {
-            this.x += this.speed;
+        // Velocity-based movement: accelerate toward the held direction and
+        // glide to a stop when released. Feels far less rigid than instant on/off.
+        const accel = 1.4;
+        const friction = 0.78;
+        const maxSpeed = this.speed;
+
+        if (gameState.keys.left) this.vx -= accel;
+        if (gameState.keys.right) this.vx += accel;
+        if (!gameState.keys.left && !gameState.keys.right) this.vx *= friction;
+
+        this.vx = Math.max(-maxSpeed, Math.min(maxSpeed, this.vx));
+        this.x += this.vx;
+
+        // Clamp to the play field and kill velocity at the walls
+        if (this.x < 0) { this.x = 0; this.vx = 0; }
+        if (this.x > CONFIG.canvas.width - this.width) {
+            this.x = CONFIG.canvas.width - this.width;
+            this.vx = 0;
         }
     }
     
@@ -275,7 +328,7 @@ class Player {
         ctx.fill();
         
         // Engine glow
-        ctx.fillStyle = '#ff6b35';
+        ctx.fillStyle = '#4da3ff';
         ctx.fillRect(this.x + 10, this.y + this.height, 8, 4 + Math.random() * 3);
         ctx.fillRect(this.x + this.width - 18, this.y + this.height, 8, 4 + Math.random() * 3);
     }
@@ -288,43 +341,35 @@ class Player {
         
         switch (weapon) {
             case 'spread':
-                // 3-way spread shot
+                // Vellox Navigator — wide monitoring coverage (3-way shot)
                 playerProjectiles.push(new Projectile(
-                    centerX - 2, this.y, -CONFIG.projectile.playerSpeed, '#ff6b35', 'player'
+                    centerX - 2, this.y, -CONFIG.projectile.playerSpeed, '#2dd4bf', 'player'
                 ));
                 playerProjectiles.push(new Projectile(
-                    centerX - 15, this.y + 5, -CONFIG.projectile.playerSpeed, '#ff6b35', 'player', -1.5
+                    centerX - 15, this.y + 5, -CONFIG.projectile.playerSpeed, '#2dd4bf', 'player', -1.5
                 ));
                 playerProjectiles.push(new Projectile(
-                    centerX + 10, this.y + 5, -CONFIG.projectile.playerSpeed, '#ff6b35', 'player', 1.5
+                    centerX + 10, this.y + 5, -CONFIG.projectile.playerSpeed, '#2dd4bf', 'player', 1.5
                 ));
                 soundManager.shootSpread();
                 break;
-                
+
             case 'laser':
-                // Powerful laser beam
+                // Vellox Reverser — precision deep-analysis beam
                 playerProjectiles.push(new Projectile(
-                    centerX - 3, this.y, -CONFIG.projectile.playerSpeed * 1.5, '#ff0040', 'player', 0, 'laser'
+                    centerX - 3, this.y, -CONFIG.projectile.playerSpeed * 1.5, '#22d3ee', 'player', 0, 'laser'
                 ));
                 soundManager.shootLaser();
                 break;
-                
-            case 'rapid':
-                // Fast single shot
-                playerProjectiles.push(new Projectile(
-                    centerX - 2, this.y, -CONFIG.projectile.playerSpeed * 1.3, '#ffdd00', 'player'
-                ));
-                soundManager.shoot();
-                break;
-                
+
             case 'missile':
-                // Homing missile
+                // Vellox Ranger — autonomous homing hunter
                 playerProjectiles.push(new Projectile(
-                    centerX - 4, this.y, -CONFIG.projectile.playerSpeed * 0.8, '#ff00ff', 'player', 0, 'missile'
+                    centerX - 4, this.y, -CONFIG.projectile.playerSpeed * 0.8, '#818cf8', 'player', 0, 'missile'
                 ));
                 soundManager.shootMissile();
                 break;
-                
+
             default:
                 // Basic shot
                 playerProjectiles.push(new Projectile(
@@ -343,10 +388,9 @@ class Player {
         // Fire rate based on weapon
         const fireRates = {
             basic: 250,
-            spread: 400,
-            laser: 350,
-            rapid: 100,
-            missile: 500
+            spread: 400,   // Navigator
+            laser: 350,    // Reverser
+            missile: 500   // Ranger
         };
         
         setTimeout(() => {
@@ -399,9 +443,9 @@ class Enemy {
     
     draw() {
         if (!this.alive) return;
-        
-        // Different colors per row
-        const colors = ['#ff0040', '#ff6b35', '#ffdd00', '#00ff41'];
+
+        // Cyber-adversary colors per row: Malware / Ransomware / APT
+        const colors = ['#ff2b4e', '#ff6b9d', '#c04dff', '#ff2b4e'];
         ctx.fillStyle = colors[this.row % colors.length];
         
         // Simple pixel-art style enemy
@@ -527,8 +571,8 @@ class Projectile {
             ctx.closePath();
             ctx.fill();
             
-            // Missile trail
-            ctx.fillStyle = '#ff6b35';
+            // Ranger homing trail
+            ctx.fillStyle = '#818cf8';
             ctx.fillRect(this.x + 2, this.y + this.height, 4, 4 + Math.random() * 4);
         } else {
             // Normal projectile
@@ -573,13 +617,12 @@ class PowerUp {
         
         // Color based on type
         const colors = {
-            spread: '#ff6b35',
-            laser: '#ff0040',
-            rapid: '#ffdd00',
-            missile: '#ff00ff',
-            shield: '#00bfff',
-            extraLife: '#00ff41',
-            bomb: '#ff4444',
+            spread: '#2dd4bf',   // Navigator
+            laser: '#22d3ee',    // Reverser
+            missile: '#818cf8',  // Ranger
+            shield: '#38bdf8',
+            extraLife: '#34d399',
+            bomb: '#ff2b4e',
             bonus: '#ffd700'
         };
         ctx.fillStyle = colors[this.type] || '#ffffff';
@@ -671,17 +714,21 @@ function createStars() {
     }
 }
 
-function updateAndDrawStars() {
+function updateStars() {
     for (const star of stars) {
         star.y += star.speed;
         if (star.y > CONFIG.canvas.height) {
             star.y = 0;
             star.x = Math.random() * CONFIG.canvas.width;
         }
-        
+
         star.brightness += (Math.random() - 0.5) * 0.1;
         star.brightness = Math.max(0.3, Math.min(1, star.brightness));
-        
+    }
+}
+
+function drawStars() {
+    for (const star of stars) {
         ctx.fillStyle = `rgba(255, 255, 255, ${star.brightness})`;
         ctx.fillRect(star.x, star.y, star.size, star.size);
     }
@@ -761,8 +808,8 @@ function checkCollisions() {
                 gameState.score += CONFIG.scoring.enemyKill * gameState.level;
                 gameState.shotsHit++;
                 gameState.enemiesDefeated++;
-                createExplosion(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, 
-                    ['#ff0040', '#ff6b35', '#ffdd00']);
+                createExplosion(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2,
+                    ['#ff2b4e', '#ff6b9d', '#c04dff']);
                 soundManager.enemyHit();
                 updateHUD();
                 
@@ -779,6 +826,8 @@ function checkCollisions() {
         if (!proj.active) continue;
         
         if (rectCollision(proj, player)) {
+            // During invincibility frames, let shots pass through harmlessly
+            if (isInvincible()) continue;
             proj.active = false;
             playerHit();
         }
@@ -806,28 +855,48 @@ function rectCollision(a, b) {
 // Game Events
 // ============================================
 
+// ============================================
+// Game Feel Helpers (screen shake, i-frames)
+// ============================================
+
+/** Trigger a screen shake, keeping the strongest active magnitude. */
+function addShake(magnitude) {
+    if (magnitude > gameState.shake) gameState.shake = magnitude;
+}
+
+/** True while the player is in post-hit invincibility frames. */
+function isInvincible() {
+    return Date.now() < gameState.invincibleUntil;
+}
+
 function playerHit() {
+    // Ignore damage during invincibility frames
+    if (isInvincible()) return;
+
     gameState.lives--;
     updateHUD();
     createExplosion(player.x + player.width / 2, player.y + player.height / 2,
-        ['#00ff41', '#00aa30', '#006618']);
+        ['#22d3ee', '#0891b2', '#0e7490']);
     soundManager.playerHit();
-    
+
+    // Juice + brief invincibility so a single hit doesn't cascade into instant death
+    addShake(12);
+    gameState.hitFlash = 1;
+    gameState.invincibleUntil = Date.now() + 1500;
+
     if (gameState.lives <= 0) {
         gameOver();
     } else {
-        // Brief invincibility flash would go here
-        addConsoleMessage("Shield impact! Stay evasive, pilot!", "commander");
+        addConsoleMessage("Perimeter breached! Rerouting — hold the line, operator.", "commander");
     }
 }
 
 function spawnPowerUp(x, y) {
     // Weighted random selection - weapons more common, bomb/extraLife rare
     const weights = {
-        spread: 20,
-        laser: 15,
-        rapid: 20,
-        missile: 15,
+        spread: 22,     // Navigator
+        laser: 20,      // Reverser
+        missile: 18,    // Ranger
         shield: 10,
         extraLife: 5,
         bomb: 5,
@@ -865,49 +934,46 @@ function collectPowerUp(powerUp) {
     // Apply power-up effect
     switch (powerUp.type) {
         case 'spread':
-            setWeapon('spread', 'Spread Shot armed!');
+            setWeapon('spread', 'VELLOX NAVIGATOR deployed — monitoring every vector.');
             soundManager.weaponPowerUp();
             break;
         case 'laser':
-            setWeapon('laser', 'Laser Beam online!');
-            soundManager.weaponPowerUp();
-            break;
-        case 'rapid':
-            setWeapon('rapid', 'Rapid Fire engaged!');
+            setWeapon('laser', 'VELLOX REVERSER deployed — dissecting threats on contact.');
             soundManager.weaponPowerUp();
             break;
         case 'missile':
-            setWeapon('missile', 'Homing Missiles loaded!');
+            setWeapon('missile', 'VELLOX RANGER deployed — autonomously hunting the adversary.');
             soundManager.weaponPowerUp();
             break;
         case 'shield':
             gameState.lives = Math.min(gameState.lives + 1, 9);
-            addConsoleMessage("Shield restored! +1 Life", "commander");
+            addConsoleMessage("Firewall patched! +1 system integrity.", "commander");
             soundManager.extraLife();
             break;
         case 'extraLife':
             gameState.lives = Math.min(gameState.lives + 2, 9);
-            addConsoleMessage("Extra lives! +2 Lives", "commander");
+            addConsoleMessage("Redundant nodes online! +2 system integrity.", "commander");
             soundManager.extraLife();
             break;
         case 'bomb':
-            // Screen clear bomb
+            // Kill-chain break — purge every active threat on screen
             let destroyed = 0;
             enemies.forEach(e => {
                 if (e.alive) {
                     e.alive = false;
                     destroyed++;
-                    createExplosion(e.x + e.width / 2, e.y + e.height / 2, ['#ff0040', '#ff6b35', '#ffdd00']);
+                    createExplosion(e.x + e.width / 2, e.y + e.height / 2, ['#ff2b4e', '#ff6b9d', '#c04dff']);
                 }
             });
             gameState.score += destroyed * CONFIG.scoring.enemyKill;
-            addConsoleMessage(`BOMB! ${destroyed} enemies vaporized!`, "commander");
+            addConsoleMessage(`KILL-CHAIN BREAK! ${destroyed} threats purged!`, "commander");
             soundManager.bomb();
+            addShake(16);
             break;
         case 'bonus':
             const bonusPoints = 250 + Math.floor(Math.random() * 500);
             gameState.score += bonusPoints;
-            addConsoleMessage(`Bonus cache! +${bonusPoints} points!`, "commander");
+            addConsoleMessage(`Threat-intel cache recovered! +${bonusPoints} points!`, "commander");
             soundManager.powerUp();
             break;
     }
@@ -929,20 +995,19 @@ function setWeapon(weapon, message) {
     gameState.weaponTimer = setTimeout(() => {
         gameState.currentWeapon = 'basic';
         updateWeaponDisplay();
-        addConsoleMessage("Weapon power depleted. Basic cannon restored.", "system");
+        addConsoleMessage("Deployment window closed. Baseline defenses restored.", "system");
     }, CONFIG.powerUp.duration);
 }
 
 function updateWeaponDisplay() {
     const names = {
-        basic: 'BASIC',
-        spread: 'SPREAD',
-        laser: 'LASER',
-        rapid: 'RAPID',
-        missile: 'MISSILE'
+        basic: 'BASELINE',
+        spread: 'NAVIGATOR',
+        laser: 'REVERSER',
+        missile: 'RANGER'
     };
-    weaponDisplay.textContent = names[gameState.currentWeapon] || 'BASIC';
-    weaponDisplay.className = `hud-value weapon-display ${gameState.currentWeapon}`;
+    weaponDisplay.textContent = names[gameState.currentWeapon] || 'BASELINE';
+    weaponDisplay.className = `stat-value weapon-display ${gameState.currentWeapon}`;
 }
 
 function createExplosion(x, y, colors) {
@@ -950,6 +1015,8 @@ function createExplosion(x, y, colors) {
         const color = colors[Math.floor(Math.random() * colors.length)];
         particles.push(new Particle(x, y, color));
     }
+    // Small kick of screen shake for every explosion adds impact
+    addShake(3);
 }
 
 // ============================================
@@ -993,13 +1060,19 @@ function startNextLevel() {
     
     // Update HUD
     updateHUD();
-    
+
+    // Announce the Vellox product phase driving this wave
+    const phase = getPhase(gameState.level);
+    addConsoleMessage(`PHASE ${gameState.level} — ${phase.product} ONLINE.`, "commander");
+    addConsoleMessage(phase.desc, "hint");
+
     // Generate level description
     llmManager.generateLevelDescription(gameState.level).then(desc => {
         addConsoleMessage(desc, "briefing");
     });
-    
+
     // Resume game
+    resetLoopClock();
     gameState.running = true;
     requestAnimationFrame(gameLoop);
 }
@@ -1061,7 +1134,7 @@ function updateAIStatus(status) {
         displayStatus = 'loading';
     }
     aiStatusDisplay.textContent = displayStatus.toUpperCase();
-    aiStatusDisplay.className = `hud-value ai-status ${displayStatus}`;
+    aiStatusDisplay.className = `stat-value ai-status ${displayStatus}`;
 }
 
 function updateDownloadProgress(progress) {
@@ -1114,11 +1187,30 @@ function addConsoleMessage(message, type = 'system') {
     p.innerHTML = `&gt; ${message}`;
     aiConsole.appendChild(p);
     aiConsole.scrollTop = aiConsole.scrollHeight;
-    
-    // Limit console messages
-    while (aiConsole.children.length > 20) {
+
+    // Limit console messages to keep the panel readable
+    while (aiConsole.children.length > 14) {
         aiConsole.removeChild(aiConsole.firstChild);
     }
+
+    // Surface story beats as a banner over the play field
+    if (['commander', 'taunt', 'briefing', 'hint'].includes(type)) {
+        showBanner(message, type);
+    }
+}
+
+let bannerTimer = null;
+
+/** Flash the latest important transmission as a banner over the game field. */
+function showBanner(message, type) {
+    if (!commandBanner) return;
+    commandBanner.textContent = message;
+    commandBanner.className = `command-banner ${type} show`;
+
+    if (bannerTimer) clearTimeout(bannerTimer);
+    bannerTimer = setTimeout(() => {
+        commandBanner.classList.remove('show');
+    }, 4800);
 }
 
 function setThinking(active) {
@@ -1192,9 +1284,9 @@ function handleKeyDown(e) {
             break;
         case 'Space':
             e.preventDefault();
-            if (gameState.running && !gameState.paused) {
-                player.shoot();
-            }
+            // Track held state; the game loop fires at the weapon's fire rate
+            // so holding Space auto-fires instead of requiring rapid tapping.
+            gameState.keys.space = true;
             break;
         case 'KeyP':
             togglePause();
@@ -1217,6 +1309,9 @@ function handleKeyUp(e) {
         case 'KeyD':
             gameState.keys.right = false;
             break;
+        case 'Space':
+            gameState.keys.space = false;
+            break;
     }
 }
 
@@ -1229,6 +1324,7 @@ function togglePause() {
         addConsoleMessage("Game paused. Press P to resume.", "system");
     } else {
         addConsoleMessage("Resuming combat operations.", "system");
+        resetLoopClock();
         requestAnimationFrame(gameLoop);
     }
 }
@@ -1237,62 +1333,205 @@ function togglePause() {
 // Game Loop
 // ============================================
 
-function gameLoop() {
-    if (!gameState.running || gameState.paused) return;
-    
-    // Clear canvas
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
-    
-    // Draw background
-    updateAndDrawStars();
-    
-    // Update game objects
+// Fixed-timestep loop: the simulation always advances in 1/60s steps
+// regardless of the monitor's refresh rate, so the game plays identically
+// on 60Hz, 120Hz or 144Hz displays instead of running faster on high-refresh
+// screens. Rendering still happens once per animation frame.
+const FIXED_DT = 1000 / 60;
+let lastTime = 0;
+let accumulator = 0;
+
+/** Advance the simulation by exactly one fixed timestep. */
+function update() {
     player.update();
+
+    // Hold-to-fire: shoot() self-limits via the per-weapon fire rate
+    if (gameState.keys.space) player.shoot();
+
     updateEnemies();
-    
-    // Update projectiles
+
     for (const proj of playerProjectiles) proj.update();
     for (const proj of enemyProjectiles) proj.update();
-    
-    // Update power-ups
     for (const powerUp of powerUps) powerUp.update();
-    
-    // Update particles
     for (const particle of particles) particle.update();
-    
-    // Check collisions
+    updateStars();
+
     checkCollisions();
-    
+
     // Clean up inactive objects
     playerProjectiles = playerProjectiles.filter(p => p.active);
     enemyProjectiles = enemyProjectiles.filter(p => p.active);
     powerUps = powerUps.filter(p => p.active);
     particles = particles.filter(p => p.active);
-    
-    // Draw everything
-    player.draw();
+
+    // Decay screen shake and hit flash
+    if (gameState.shake > 0) {
+        gameState.shake *= 0.88;
+        if (gameState.shake < 0.4) gameState.shake = 0;
+    }
+    if (gameState.hitFlash > 0) {
+        gameState.hitFlash = Math.max(0, gameState.hitFlash - 0.05);
+    }
+}
+
+/** Draw the current world state, once per animation frame. */
+function render() {
+    // Clear canvas (full area, before any shake offset, to avoid smearing)
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
+
+    ctx.save();
+    if (gameState.shake > 0) {
+        ctx.translate(
+            (Math.random() - 0.5) * gameState.shake,
+            (Math.random() - 0.5) * gameState.shake
+        );
+    }
+
+    drawStars();
+
+    // Blink the player while invincible so hits read clearly
+    if (!isInvincible() || Math.floor(Date.now() / 80) % 2 === 0) {
+        player.draw();
+    }
+
     for (const enemy of enemies) enemy.draw();
     for (const proj of playerProjectiles) proj.draw();
     for (const proj of enemyProjectiles) proj.draw();
     for (const powerUp of powerUps) powerUp.draw();
     for (const particle of particles) particle.draw();
-    
-    // Trigger LLM updates (non-blocking)
+
+    ctx.restore();
+
+    // Red damage flash overlays the whole screen
+    if (gameState.hitFlash > 0) {
+        ctx.fillStyle = `rgba(255, 40, 40, ${gameState.hitFlash * 0.4})`;
+        ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
+    }
+}
+
+function gameLoop(timestamp) {
+    if (!gameState.running || gameState.paused) return;
+
+    if (!lastTime) lastTime = timestamp;
+    let frameTime = timestamp - lastTime;
+    lastTime = timestamp;
+
+    // Avoid a "spiral of death" after the tab was backgrounded
+    if (frameTime > 250) frameTime = 250;
+    accumulator += frameTime;
+
+    // Run as many fixed steps as have accumulated (capped so we never stall)
+    let steps = 0;
+    while (accumulator >= FIXED_DT && steps < 5) {
+        update();
+        accumulator -= FIXED_DT;
+        steps++;
+        // update() may end the game (game over / level complete)
+        if (!gameState.running || gameState.paused) break;
+    }
+    if (steps >= 5) accumulator = 0;
+
+    render();
+
+    // Trigger LLM updates (non-blocking, throttled internally)
     triggerEnemyTaunt();
     triggerPerformanceComment();
-    
-    // Continue loop
+
     if (gameState.running && !gameState.paused) {
         requestAnimationFrame(gameLoop);
     }
+}
+
+/** Reset the frame timer so resuming/starting doesn't jump the simulation. */
+function resetLoopClock() {
+    lastTime = 0;
+    accumulator = 0;
 }
 
 // ============================================
 // Game Initialization
 // ============================================
 
+// ============================================
+// Responsive Fit — size everything to the viewport, no scrolling
+// ============================================
+
+const DISPLAY_ASPECT = CONFIG.canvas.width / CONFIG.canvas.height; // 6:5
+
+/**
+ * Fit the game + command console inside the .stage area (whose size the
+ * browser computes via flexbox after the top bar and footer take their space).
+ * We measure the stage directly — no magic numbers — then choose side-by-side
+ * vs. stacked by whichever makes the game bigger, and size both to fit exactly.
+ * Guarantees: no scrolling, the console is never clipped, 6:5 ratio preserved.
+ */
+function fitLayout() {
+    const stage = document.querySelector('.stage');
+    const console_ = document.querySelector('.ai-console');
+    if (!canvas || !stage || !console_) return;
+
+    const availW = stage.clientWidth;
+    const availH = stage.clientHeight;
+    if (availW <= 0 || availH <= 0) return;
+
+    const BORDER = 2;            // .game-container / .ai-console border (1px * 2)
+    const GAP = 14;             // .stage gap between game and console
+    const CONSOLE_W = 320;      // side-panel width (row layout)
+    const COL_CONSOLE_MIN = 120; // min console height when stacked
+
+    // Row: console beside the canvas
+    const rowCanvasW = availW - CONSOLE_W - GAP - BORDER;
+    const rowH = Math.min(availH - BORDER, rowCanvasW / DISPLAY_ASPECT);
+
+    // Column: reserve a minimum console height first, canvas gets the rest
+    const colH = Math.min(
+        availH - COL_CONSOLE_MIN - GAP - BORDER,
+        (availW - BORDER) / DISPLAY_ASPECT
+    );
+
+    let layout, h;
+    if (rowH >= colH) { layout = 'row'; h = rowH; }
+    else { layout = 'column'; h = colH; }
+
+    if (!(h > 0)) {   // degenerate tiny area — keep everything visible
+        layout = 'column';
+        h = Math.max(60, (availW - BORDER) / DISPLAY_ASPECT);
+    }
+    h = Math.floor(h);
+    const w = Math.floor(h * DISPLAY_ASPECT);
+
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+
+    if (layout === 'row') {
+        stage.style.flexDirection = 'row';
+        console_.style.width = CONSOLE_W + 'px';
+        console_.style.height = (h + BORDER) + 'px';   // match game height exactly
+    } else {
+        stage.style.flexDirection = 'column';
+        console_.style.width = (w + BORDER) + 'px';
+        const consoleH = Math.max(COL_CONSOLE_MIN, availH - (h + BORDER) - GAP);
+        console_.style.height = consoleH + 'px';
+    }
+}
+
 async function initGame() {
+    // Fit the layout now and on ANY size change — window resize OR the stage
+    // element itself being resized (covers embedded preview panels / iframes).
+    fitLayout();
+    window.addEventListener('resize', fitLayout);
+    if (window.ResizeObserver) {
+        const stage = document.querySelector('.stage');
+        const ro = new ResizeObserver(() => fitLayout());
+        if (stage) ro.observe(stage);
+        ro.observe(document.documentElement);
+    }
+    if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(fitLayout);
+    }
+    requestAnimationFrame(fitLayout);
+
     // Load high score from leaderboard
     loadHighScore();
     updateHUD();
@@ -1303,9 +1542,9 @@ async function initGame() {
     const llmAvailable = await llmManager.initialize();
     
     if (llmAvailable) {
-        addConsoleMessage("AI Commander online. Ready for battle!", "commander");
+        addConsoleMessage("VELLOX Command online. AI-native defense standing by.", "commander");
     } else {
-        addConsoleMessage("Welcome, pilot! Ready for combat.", "system");
+        addConsoleMessage("VELLOX Command standing by. Deploy when ready, operator.", "system");
     }
     
     // Create background
@@ -1326,7 +1565,7 @@ async function initGame() {
     
     // Save score handler
     saveScoreBtn.addEventListener('click', () => {
-        const name = playerNameInput.value.trim() || 'PILOT';
+        const name = playerNameInput.value.trim() || 'OPERATOR';
         const rank = addScore(name, gameState.score, gameState.level);
         nameInputSection.classList.add('hidden');
         addConsoleMessage(`Score saved! Rank #${rank + 1}`, 'commander');
@@ -1370,13 +1609,21 @@ function startGame() {
     
     // Update HUD
     updateHUD();
-    
+
+    // Set the scene: the Vellox story + phase 1 product
+    addConsoleMessage("Adversary AI detected. Breakout time: under 30 minutes.", "taunt");
+    addConsoleMessage("This is VELLOX Command. We fight AI with AI — we close the speed gap.", "commander");
+    const phase = getPhase(1);
+    addConsoleMessage(`PHASE 1 — ${phase.product} ONLINE.`, "commander");
+    addConsoleMessage(phase.desc, "hint");
+
     // Get initial briefing
     llmManager.generateBriefing(1, 0).then(briefing => {
         addConsoleMessage(briefing, "briefing");
     });
-    
+
     // Start game
+    resetLoopClock();
     gameState.running = true;
     requestAnimationFrame(gameLoop);
 }
@@ -1390,7 +1637,7 @@ function restartGame() {
     
     // Clear console
     aiConsole.innerHTML = '';
-    addConsoleMessage("Reinitializing combat systems...", "system");
+    addConsoleMessage("Reinitializing VELLOX defense grid...", "system");
     
     // Create new game objects
     player = new Player();
@@ -1410,6 +1657,7 @@ function restartGame() {
     });
     
     // Start game
+    resetLoopClock();
     gameState.running = true;
     requestAnimationFrame(gameLoop);
 }
@@ -1427,6 +1675,9 @@ function resetGameState() {
     gameState.enemiesDefeated = 0;
     gameState.lastTauntTime = 0;
     gameState.lastCommentTime = 0;
+    gameState.shake = 0;
+    gameState.hitFlash = 0;
+    gameState.invincibleUntil = 0;
     gameState.keys = { left: false, right: false, space: false };
     gameState.canShoot = true;
     

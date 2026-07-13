@@ -88,9 +88,41 @@ function renderProgressBar(progress) {
     }
 }
 
+/**
+ * Resolve a model from the catalog, retrying with exponential backoff.
+ * The Azure Foundry catalog can return HTTP 429 (QuotaExceeded / TooManyRequests)
+ * when hit too often — a transient condition we should ride out rather than
+ * dropping straight to offline mode.
+ */
+async function getModelWithRetry(catalog, alias, maxAttempts = 6) {
+    let lastError;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            const model = await catalog.getModel(alias);
+            if (model) return model;
+            lastError = new Error(`Model "${alias}" not found in catalog`);
+        } catch (error) {
+            lastError = error;
+        }
+
+        const msg = lastError?.message || '';
+        const rateLimited = /429|too many requests|toomanyrequests|quotaexceeded/i.test(msg);
+
+        if (attempt < maxAttempts) {
+            // Backoff: 1s, 2s, 4s, 8s, capped at 15s (longer waits when rate limited)
+            const base = rateLimited ? 1000 * 2 ** (attempt - 1) : 1500;
+            const delay = Math.min(base, 15000);
+            initStatus.message = `Foundry catalog busy${rateLimited ? ' (rate limited)' : ''} — retry ${attempt}/${maxAttempts - 1} in ${Math.round(delay / 1000)}s...`;
+            console.log(`[Server] ${initStatus.message}`);
+            await new Promise(r => setTimeout(r, delay));
+        }
+    }
+    throw lastError;
+}
+
 async function initializeFoundry() {
     if (isInitialized) return true;
-    
+
     initStatus.state = 'initializing';
     initStatus.message = 'Starting Foundry Local SDK...';
     initStatus.modelAlias = CONFIG.modelAlias;
@@ -102,7 +134,7 @@ async function initializeFoundry() {
         console.log('[Server] Creating Foundry Local Manager...');
         initStatus.message = 'Creating Foundry Local Manager...';
         foundryManager = FoundryLocalManager.create({
-            appName: 'space-invaders-ai-commander',
+            appName: 'vellox-cyber-defense-simulator',
             logLevel: 'info'
         });
         
@@ -110,12 +142,8 @@ async function initializeFoundry() {
         console.log(`[Server] Looking for model: ${CONFIG.modelAlias}...`);
         initStatus.message = `Looking for model: ${CONFIG.modelAlias}...`;
         const catalog = foundryManager.catalog;
-        const model = await catalog.getModel(CONFIG.modelAlias);
-        
-        if (!model) {
-            throw new Error(`Model "${CONFIG.modelAlias}" not found in catalog`);
-        }
-        
+        const model = await getModelWithRetry(catalog, CONFIG.modelAlias);
+
         console.log(`[Server] Found model: ${model.alias}`);
         
         // Step 3: Check if model is cached, download if needed
@@ -159,6 +187,8 @@ async function initializeFoundry() {
     } catch (error) {
         console.error('[Server] Failed to initialize Foundry Local:', error.message);
         console.error('[Server] Troubleshooting tips:');
+        console.error('         - If this was a 429 / "TooManyRequests" from the Foundry catalog,');
+        console.error('           it is a temporary Azure rate limit — wait a minute and run "npm start" again.');
         console.error('         - Ensure foundry-local-sdk is installed: npm install foundry-local-sdk');
         console.error('         - Check that you have sufficient disk space for model download');
         console.error('         - Try a different model alias if phi-3.5-mini is unavailable');
@@ -375,8 +405,8 @@ const server = http.createServer(async (req, res) => {
 
 async function start() {
     console.log('========================================');
-    console.log('  Space Invaders - AI Commander Server');
-    console.log('  Foundry Local SDK v0.9.0');
+    console.log('  VELLOX - Cyber Defense Simulator');
+    console.log('  Booz Allen Hamilton | Foundry Local SDK v0.9.0');
     console.log('========================================');
     console.log('');
     

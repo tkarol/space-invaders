@@ -118,81 +118,82 @@ class PromptCache {
  * These maintain the game experience without AI.
  */
 const FALLBACK_RESPONSES = {
+    // Adversary AI trash-talk — the machine-speed attacker taunting the defender
     taunts: [
-        "Your aim is terrible, human!",
-        "Prepare to be vaporized!",
-        "We will conquer your planet!",
-        "Resistance is futile!",
-        "You cannot stop us!",
-        "Your weapons are primitive!",
-        "We have traveled galaxies to destroy you!",
-        "Surrender now, Earthling!",
-        "Our fleet is infinite!",
-        "You fight alone against millions!"
+        "Your defenses run at human speed. I do not.",
+        "I breached the perimeter before you finished reading this.",
+        "Every second you hesitate, I move laterally.",
+        "Your signatures are stale. My payloads are not.",
+        "I am already inside. Vellox is just cleanup.",
+        "Detection? I mutate faster than you can write a rule.",
+        "Thirty minutes to own your enterprise. I'll take less.",
+        "You patch. I pivot. You lose.",
+        "I automated this attack. Can you automate the defense?",
+        "Another endpoint falls. Your move, operator."
     ],
-    
+
     briefings: [
-        "Incoming wave detected. Stay alert, pilot.",
-        "Enemy reinforcements approaching. Good luck.",
-        "New hostiles on radar. Show them what you've got.",
-        "Alien signatures detected. Engage at will.",
-        "Multiple contacts incoming. Stay focused.",
-        "The enemy grows stronger. Adapt and overcome.",
-        "Heavy resistance ahead. Keep your shields up.",
-        "Threat level increasing. Stay sharp, commander."
+        "Adversary AI inbound. Deploy Vellox and close the speed gap.",
+        "Machine-speed intrusion detected. Meet it with AI-native defense.",
+        "New attack wave on the wire. Fight AI with AI, operator.",
+        "Threat actors are escalating. Vellox is your force multiplier.",
+        "Breakout time is shrinking. Outpace them — engage now.",
+        "The adversary automates. So do we. Hold the boundary.",
+        "Hostile agents mapping your network. Deny them ground.",
+        "Elevated threat level. Trust the tradecraft. Deploy Vellox."
     ],
-    
+
     levelDescriptions: [
-        "Sector Alpha - The invasion begins.",
-        "Sector Beta - Enemy forces intensify.",
-        "Sector Gamma - Deep space combat zone.",
-        "Sector Delta - The heart of enemy territory.",
-        "Sector Omega - Final stand against the horde."
+        "Phase 1 — Vellox Reverser dissects the payload in minutes.",
+        "Phase 2 — Vellox Ranger maps the environment and hunts the intrusion.",
+        "Phase 3 — Vellox Navigator holds continuous watch across every vector.",
+        "The adversary adapts — Vellox adapts faster.",
+        "Deep in the kill chain. Machine-speed defense holds the line."
     ],
-    
+
     powerUpHints: [
-        "Power-up detected! Rapid fire incoming!",
-        "Shield boost available in the debris field!",
-        "Multi-shot upgrade spotted! Grab it fast!",
-        "Bonus points floating through the sector!",
-        "Special weapon cache detected!"
+        "Vellox capability inbound — grab it, operator!",
+        "Reverser online: threats dissected on contact!",
+        "Ranger deployed: autonomous hunt engaged!",
+        "Navigator active: every vector under watch!",
+        "Threat-intel cache on the field — recover it!"
     ],
-    
+
     performanceComments: {
         excellent: [
-            "Outstanding performance, pilot!",
-            "You're a natural ace!",
-            "The enemy trembles before you!",
-            "Exceptional marksmanship!",
-            "You fight like a legend!"
+            "Textbook defense. You're operating at AI speed.",
+            "Dwell time near zero. Elite tradecraft, operator.",
+            "The adversary can't keep pace with you.",
+            "Machine-speed containment. Outstanding.",
+            "You closed the speed gap. Keep it closed."
         ],
         good: [
-            "Solid shooting, keep it up!",
-            "You're doing well, pilot.",
-            "Nice work out there!",
-            "Holding the line admirably!",
-            "Good progress, commander."
+            "Solid containment. Keep the pressure on.",
+            "Holding the boundary well, operator.",
+            "Good hunting. Dwell time is dropping.",
+            "The line holds. Stay sharp.",
+            "Steady defense — Vellox has your back."
         ],
         average: [
-            "Stay focused, you can do better.",
-            "Keep practicing, pilot.",
-            "The enemy is testing you.",
-            "Don't give up now!",
-            "You're learning the ropes."
+            "The adversary is probing. Tighten your response.",
+            "Stay ahead of the kill chain, operator.",
+            "They're testing your perimeter. Adapt.",
+            "Keep pace — machine speed waits for no one.",
+            "Hold the line. Deploy your Vellox capabilities."
         ],
         poor: [
-            "The enemy is gaining ground...",
-            "We need better results, pilot.",
-            "Concentrate on your aim!",
-            "Earth is counting on you!",
-            "Dig deep and fight harder!"
+            "Dwell time is climbing. Regain the initiative.",
+            "The adversary is gaining ground — respond faster.",
+            "Perimeter is slipping. Escalate now, operator.",
+            "They're moving laterally. Cut them off.",
+            "Fight AI with AI — deploy Vellox and push back."
         ]
     },
-    
+
     gameOverComments: {
-        highScore: "Legendary performance! You've earned your place among the stars.",
-        mediumScore: "A valiant effort. The galaxy will remember your sacrifice.",
-        lowScore: "The battle was lost, but hope remains. Try again, pilot."
+        highScore: "Threat contained at machine speed. This is what closing the speed gap looks like.",
+        mediumScore: "The adversary broke through, but you made them work for it. Redeploy and hunt back.",
+        lowScore: "Breach confirmed. Regroup, deploy Vellox, and turn AI against the attacker."
     }
 };
 
@@ -451,9 +452,9 @@ class LLMManager {
             if (cached) return cached;
         }
         
-        const systemPrompt = `You are an alien commander in a Space Invaders game. Generate a short, menacing taunt for the human player. Keep it under 15 words. Be creative and threatening but appropriate for all ages.`;
-        
-        const userPrompt = `The player is on level ${context.level} with score ${context.score}. Generate a unique alien taunt.`;
+        const systemPrompt = `You are a hostile, AI-powered cyber adversary in a game defending against Booz Allen's Vellox cyber suite. Taunt the human defender about attacking at machine speed, breaching perimeters, malware, and moving faster than their defenses. Keep it under 15 words. Menacing but appropriate for all ages. No profanity.`;
+
+        const userPrompt = `The defender is on phase ${context.level} with score ${context.score}. Generate a unique cyber-adversary taunt.`;
         
         const response = await this.sendPrompt(systemPrompt, userPrompt, {
             maxTokens: 50,
@@ -481,9 +482,9 @@ class LLMManager {
             if (cached) return cached;
         }
         
-        const systemPrompt = `You are an AI Commander guiding a pilot in a Space Invaders game. Generate a brief mission briefing for the upcoming level. Keep it under 25 words. Be encouraging but serious about the threat.`;
-        
-        const userPrompt = `Generate a briefing for Level ${level}. The pilot's current score is ${previousScore}. Make it feel unique and urgent.`;
+        const systemPrompt = `You are VELLOX Command, Booz Allen Hamilton's AI-native cyber-defense assistant. The philosophy is "Fight AI With AI" — pairing machine-speed automation with adversary tradecraft to close the speed gap against AI-powered attackers. Give a brief, urgent mission briefing to the human operator. You may reference Vellox products: Reverser (malware reverse-engineering), Ranger (autonomous detection/hunting), Navigator (continuous monitoring). Keep it under 25 words. Encouraging but serious.`;
+
+        const userPrompt = `Generate a briefing for defense phase ${level}. The operator's current score is ${previousScore}. Make it feel unique and urgent.`;
         
         const response = await this.sendPrompt(systemPrompt, userPrompt, {
             maxTokens: 60,
@@ -510,9 +511,9 @@ class LLMManager {
             if (cached) return cached;
         }
         
-        const systemPrompt = `You are a narrator in a Space Invaders game. Generate a short, atmospheric description of a space sector where battle will take place. Keep it under 20 words. Make it sound epic and dangerous.`;
-        
-        const userPrompt = `Describe the space sector for Level ${level}. Make each sector feel unique.`;
+        const systemPrompt = `You are VELLOX Command narrating a cyber-defense engagement. Describe the current attack phase and how a Vellox product counters it. Products cycle: phase 1 = Vellox Reverser (reverse-engineer the malware), phase 2 = Vellox Ranger (autonomously hunt the intrusion), phase 3 = Vellox Navigator (continuous monitoring). Keep it under 20 words. Sound sharp and technical.`;
+
+        const userPrompt = `Describe defense phase ${level} and the Vellox capability holding the line. Make each phase feel distinct.`;
         
         const response = await this.sendPrompt(systemPrompt, userPrompt, {
             maxTokens: 50,
@@ -540,9 +541,9 @@ class LLMManager {
             if (cached) return cached;
         }
         
-        const systemPrompt = `You are an AI Commander in a Space Invaders game. Alert the pilot about a power-up. Keep it under 12 words. Sound excited but professional.`;
-        
-        const userPrompt = `A ${powerUpType} power-up has appeared. Alert the pilot!`;
+        const systemPrompt = `You are VELLOX Command. Alert the operator that a Vellox capability is available to deploy. Map types: laser=Vellox Reverser, missile=Vellox Ranger, spread=Vellox Navigator, shield=firewall patch, extraLife=redundant nodes, bomb=kill-chain break, bonus=threat-intel cache. Keep it under 12 words. Excited but professional.`;
+
+        const userPrompt = `A ${powerUpType} capability has appeared. Alert the operator!`;
         
         const response = await this.sendPrompt(systemPrompt, userPrompt, {
             maxTokens: 30,
@@ -577,9 +578,9 @@ class LLMManager {
             if (cached) return cached;
         }
         
-        const systemPrompt = `You are an AI Commander commenting on a pilot's performance in Space Invaders. Generate a short comment (under 15 words) that matches their performance level: ${performanceLevel}.`;
-        
-        const userPrompt = `Player accuracy: ${accuracy}%, efficiency: ${efficiency}%. Comment on their ${performanceLevel} performance.`;
+        const systemPrompt = `You are VELLOX Command assessing a cyber operator's defense in real time. Use SOC language — dwell time, containment, kill chain, machine speed. Generate a short comment (under 15 words) matching their performance level: ${performanceLevel}.`;
+
+        const userPrompt = `Operator detection accuracy: ${accuracy}%, containment efficiency: ${efficiency}%. Comment on their ${performanceLevel} defense.`;
         
         const response = await this.sendPrompt(systemPrompt, userPrompt, {
             maxTokens: 40,
@@ -607,9 +608,9 @@ class LLMManager {
             if (cached) return cached;
         }
         
-        const systemPrompt = `You are an AI Commander delivering a final message after a Space Invaders game ends. Be respectful of the player's effort. Keep it under 25 words.`;
-        
-        const userPrompt = `Game over. Score: ${score}, Level reached: ${level}. Generate a ${context.scoreRange}-score appropriate farewell message.`;
+        const systemPrompt = `You are VELLOX Command delivering a final after-action message once the engagement ends (the adversary breached the defense). Reference closing the speed gap and fighting AI with AI. Be respectful of the operator's effort. Keep it under 25 words.`;
+
+        const userPrompt = `Engagement over. Score: ${score}, phase reached: ${level}. Generate a ${context.scoreRange}-score after-action message.`;
         
         const response = await this.sendPrompt(systemPrompt, userPrompt, {
             maxTokens: 60,
