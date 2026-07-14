@@ -1483,12 +1483,13 @@ function fitLayout() {
 
     const BORDER = 2;            // .game-container / .ai-console border (1px * 2)
     const GAP = 14;             // .stage gap between game and console
-    const CONSOLE_W = 400;      // side-panel width (row layout) — wider = more readable
+    const CONSOLE_RATIO = 0.85; // console width ≈ 85% of the game width (row layout)
     const COL_CONSOLE_MIN = 140; // min console height when stacked
 
-    // Row: console beside the canvas
-    const rowCanvasW = availW - CONSOLE_W - GAP - BORDER;
-    const rowH = Math.min(availH - BORDER, rowCanvasW / DISPLAY_ASPECT);
+    // Row: the game and the console share the width, with the console sized to
+    // ≈ CONSOLE_RATIO of the game's width (so it's almost as big as the game).
+    const rowGameW = (availW - GAP - 2 * BORDER) / (1 + CONSOLE_RATIO);
+    const rowH = Math.min(availH - BORDER, rowGameW / DISPLAY_ASPECT);
 
     // Column: reserve a minimum console height first, canvas gets the rest
     const colH = Math.min(
@@ -1500,7 +1501,7 @@ function fitLayout() {
     // enough to keep the game usably large — it makes the command feed tall and
     // readable as it scrolls. Only stack on narrow / portrait screens.
     let layout, h;
-    if (rowH >= 340 || rowH >= colH) { layout = 'row'; h = rowH; }
+    if (rowH >= 300 || rowH >= colH) { layout = 'row'; h = rowH; }
     else { layout = 'column'; h = colH; }
 
     if (!(h > 0)) {   // degenerate tiny area — keep everything visible
@@ -1515,7 +1516,7 @@ function fitLayout() {
 
     if (layout === 'row') {
         stage.style.flexDirection = 'row';
-        console_.style.width = CONSOLE_W + 'px';
+        console_.style.width = Math.round(w * CONSOLE_RATIO) + 'px';
         console_.style.height = (h + BORDER) + 'px';   // match game height exactly
     } else {
         stage.style.flexDirection = 'column';
