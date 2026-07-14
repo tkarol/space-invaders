@@ -1273,6 +1273,10 @@ async function triggerPerformanceComment() {
 // ============================================
 
 function handleKeyDown(e) {
+    // Don't hijack keys while typing in a text field (e.g. the callsign input),
+    // otherwise letters like "R" would trigger game controls (restart) mid-type.
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+
     switch (e.code) {
         case 'ArrowLeft':
         case 'KeyA':
@@ -1300,6 +1304,8 @@ function handleKeyDown(e) {
 }
 
 function handleKeyUp(e) {
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+
     switch (e.code) {
         case 'ArrowLeft':
         case 'KeyA':
