@@ -1188,8 +1188,8 @@ function addConsoleMessage(message, type = 'system') {
     aiConsole.appendChild(p);
     aiConsole.scrollTop = aiConsole.scrollHeight;
 
-    // Limit console messages to keep the panel readable
-    while (aiConsole.children.length > 14) {
+    // Keep a healthy scrollback in the taller side panel
+    while (aiConsole.children.length > 30) {
         aiConsole.removeChild(aiConsole.firstChild);
     }
 
@@ -1483,8 +1483,8 @@ function fitLayout() {
 
     const BORDER = 2;            // .game-container / .ai-console border (1px * 2)
     const GAP = 14;             // .stage gap between game and console
-    const CONSOLE_W = 320;      // side-panel width (row layout)
-    const COL_CONSOLE_MIN = 120; // min console height when stacked
+    const CONSOLE_W = 400;      // side-panel width (row layout) — wider = more readable
+    const COL_CONSOLE_MIN = 140; // min console height when stacked
 
     // Row: console beside the canvas
     const rowCanvasW = availW - CONSOLE_W - GAP - BORDER;
@@ -1496,8 +1496,11 @@ function fitLayout() {
         (availW - BORDER) / DISPLAY_ASPECT
     );
 
+    // Prefer side-by-side (console beside the game) whenever the window is wide
+    // enough to keep the game usably large — it makes the command feed tall and
+    // readable as it scrolls. Only stack on narrow / portrait screens.
     let layout, h;
-    if (rowH >= colH) { layout = 'row'; h = rowH; }
+    if (rowH >= 340 || rowH >= colH) { layout = 'row'; h = rowH; }
     else { layout = 'column'; h = colH; }
 
     if (!(h > 0)) {   // degenerate tiny area — keep everything visible
