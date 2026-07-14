@@ -1,20 +1,7 @@
 {
-  "version": 2,
-  "builds": [
-    { "src": "api/chat.js", "use": "@vercel/node" },
-    { "src": "api/health.js", "use": "@vercel/node" },
-    { "src": "api/status.js", "use": "@vercel/node" },
-    { "src": "index.html", "use": "@vercel/static" },
-    { "src": "game.js", "use": "@vercel/static" },
-    { "src": "llm.js", "use": "@vercel/static" },
-    { "src": "sound.js", "use": "@vercel/static" },
-    { "src": "styles.css", "use": "@vercel/static" }
-  ],
-  "routes": [
-    { "src": "/chat", "dest": "/api/chat" },
-    { "src": "/health", "dest": "/api/health" },
-    { "src": "/status", "dest": "/api/status" },
-    { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/index.html" }
+  "rewrites": [
+    { "source": "/chat", "destination": "/api/chat" },
+    { "source": "/health", "destination": "/api/health" },
+    { "source": "/status", "destination": "/api/status" }
   ]
 }

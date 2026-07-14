@@ -34,6 +34,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PUBLIC_DIR = path.join(__dirname, 'public');   // static game files live here
 const PORT = process.env.PORT || 3001;
 
 // ---- Load config: ai-config.json first, then env-var overrides ----
@@ -149,8 +150,8 @@ const server = http.createServer(async (req, res) => {
     // ---- Static file serving ----
     if (req.method === 'GET') {
         let filePath = url.pathname === '/' ? '/index.html' : url.pathname;
-        const fullPath = path.join(__dirname, decodeURIComponent(filePath));
-        if (!fullPath.startsWith(__dirname)) { res.writeHead(403); res.end('Forbidden'); return; }
+        const fullPath = path.join(PUBLIC_DIR, decodeURIComponent(filePath));
+        if (!fullPath.startsWith(PUBLIC_DIR)) { res.writeHead(403); res.end('Forbidden'); return; }
         fs.readFile(fullPath, (err, content) => {
             if (err) { res.writeHead(404); res.end('Not found'); return; }
             res.writeHead(200, { 'Content-Type': MIME_TYPES[path.extname(fullPath).toLowerCase()] || 'application/octet-stream' });

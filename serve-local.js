@@ -21,6 +21,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PUBLIC_DIR = path.join(__dirname, 'public');   // static game files live here
 const PORT = process.env.PORT || 8080;
 
 const MIME_TYPES = {
@@ -40,10 +41,10 @@ const server = http.createServer((req, res) => {
     let urlPath = decodeURIComponent(req.url.split('?')[0]);
     if (urlPath === '/') urlPath = '/index.html';
 
-    const fullPath = path.join(__dirname, urlPath);
+    const fullPath = path.join(PUBLIC_DIR, urlPath);
 
-    // Prevent directory traversal outside the project folder
-    if (!fullPath.startsWith(__dirname)) {
+    // Prevent directory traversal outside the public folder
+    if (!fullPath.startsWith(PUBLIC_DIR)) {
         res.writeHead(403);
         res.end('Forbidden');
         return;

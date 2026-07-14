@@ -26,6 +26,7 @@ import { fileURLToPath } from 'url';
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const PUBLIC_DIR = path.join(__dirname, 'public');   // static game files live here
 
 // MIME types for static file serving
 const MIME_TYPES = {
@@ -268,10 +269,10 @@ const server = http.createServer(async (req, res) => {
     // Serve static files for root and game files
     if (req.method === 'GET' && !url.pathname.startsWith('/chat') && url.pathname !== '/health') {
         let filePath = url.pathname === '/' ? '/index.html' : url.pathname;
-        const fullPath = path.join(__dirname, filePath);
-        
+        const fullPath = path.join(PUBLIC_DIR, filePath);
+
         // Security: prevent directory traversal
-        if (!fullPath.startsWith(__dirname)) {
+        if (!fullPath.startsWith(PUBLIC_DIR)) {
             res.writeHead(403, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Forbidden' }));
             return;
