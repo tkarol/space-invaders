@@ -6,6 +6,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "cloud": "node server-cloud.js",
+    "standalone": "node serve-local.js",
     "dev": "node --watch server.js",
     "test": "node test/llm.test.js && node test/game.test.js",
     "test:server": "node test/server.test.js",
@@ -20,7 +22,8 @@
   ],
   "author": "",
   "license": "MIT",
-  "dependencies": {
+  "comment": "foundry-local-sdk is OPTIONAL: only server.js (local Foundry model) needs it. If its native koffi dependency is blocked (e.g. locked-down/corporate machines) npm install still succeeds; use server-cloud.js or deploy for AI instead.",
+  "optionalDependencies": {
     "foundry-local-sdk": "^0.9.0"
   }
 }

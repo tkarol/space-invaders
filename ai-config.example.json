@@ -1,0 +1,11 @@
+{
+  "_comment": "Copy this file to ai-config.json and paste your key. ai-config.json is git-ignored so your key stays private.",
+  "_providers": {
+    "gemini": "Free key (no credit card): https://aistudio.google.com/apikey  — leave baseUrl empty.",
+    "openai": "Works with OpenAI, Groq, OpenRouter. For Groq (free): set baseUrl to https://api.groq.com/openai/v1 and model to llama-3.1-8b-instant, key from https://console.groq.com/keys"
+  },
+  "provider": "gemini",
+  "apiKey": "PASTE_YOUR_KEY_HERE",
+  "model": "",
+  "baseUrl": ""
+}

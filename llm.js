@@ -39,6 +39,14 @@ const LLM_CONFIG = {
     requestTimeout: 10000
 };
 
+// Base URL for the AI proxy. When the page is served over http(s) the API is
+// same-origin — this works BOTH locally (server-cloud.js / server.js on the
+// same port) AND when deployed to a host (Vercel etc.). For file:// (a
+// double-clicked index.html) fall back to the local dev server.
+const API_BASE = (typeof location !== 'undefined' && location.protocol.startsWith('http'))
+    ? ''
+    : 'http://localhost:3001';
+
 // ============================================
 // Prompt Cache Implementation
 // ============================================
@@ -255,7 +263,7 @@ class LLMManager {
      */
     async pollServerStatus() {
         try {
-            const response = await fetch('http://localhost:3001/status');
+            const response = await fetch(`${API_BASE}/status`);
             if (response.ok) {
                 return await response.json();
             }
@@ -339,7 +347,7 @@ class LLMManager {
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), 2000);
             
-            const response = await fetch('http://localhost:3001/health', {
+            const response = await fetch(`${API_BASE}/health`, {
                 signal: controller.signal
             });
             
@@ -371,7 +379,7 @@ class LLMManager {
                 options.timeout || LLM_CONFIG.requestTimeout
             );
             
-            const response = await fetch('http://localhost:3001/chat', {
+            const response = await fetch(`${API_BASE}/chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -406,7 +414,7 @@ class LLMManager {
         if (!this.isAvailable) return null;
         
         try {
-            const response = await fetch('http://localhost:3001/chat/stream', {
+            const response = await fetch(`${API_BASE}/chat/stream`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ systemPrompt, userPrompt })

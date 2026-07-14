@@ -1,0 +1,9 @@
+# Server sources not needed by the Vercel (serverless) deploy
+server.js
+server-cloud.js
+serve-local.js
+test/
+.claude/
+ai-config.json
+ai-config.example.json
+node_modules
